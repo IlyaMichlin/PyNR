@@ -6,6 +6,7 @@ Generate and map SS/BPCH block on the downlink grid
 import numpy as np
 
 from gNB.SequenceGeneration import generate_pseudo_random_sequence
+from NRConstants import FR1_HIGH, FR2_LOW, FR2_HIGH
 
 
 def _generate_cell_id(N_id_1, N_id_2):
@@ -95,7 +96,7 @@ def _generate_pbch_dmrs(N_cell_id, n_hf, L_max_hat):
     return r
 
 
-def _generate_sspbch_block(N_id_1, N_id_2, d_pbch, n_hf, L_max_hat, beta_pss=0, beta_pbch=1):
+def _generate_sspbch_block(N_id_1, N_id_2, d_pbch, n_hf, L_max_hat, beta_pss=0, beta_pbch=0):
     """3GPP 38.211 7.4.3.1 V.16.0.0
 
     :param N_id_1: PCI group, range(0, 336)
@@ -107,6 +108,12 @@ def _generate_sspbch_block(N_id_1, N_id_2, d_pbch, n_hf, L_max_hat, beta_pss=0, 
     :param beta_pbch: PDCCH DMRS EPRE to SSS EPRE is within -8 dB and 8 dB. 3GPP 38.213 4.1 V.16.0.0
     :return: SS/PBCH block
     """
+    # check betas
+    if beta_pss != 0 | beta_pss != 3:
+        raise Exception('Incorrect PSS power boost')
+    if beta_pbch < -8 | beta_pbch > 8:
+        raise Exception('Incorrect PDCCH DMRS EPRE power')
+
     # generate SS/PBCH block
     sspbch_block = np.zeros((240,4), dtype='complex')
 
@@ -115,13 +122,12 @@ def _generate_sspbch_block(N_id_1, N_id_2, d_pbch, n_hf, L_max_hat, beta_pss=0, 
 
     # map PSS
     pss = _generate_PSS(N_id_2)
-    pss *= beta_pss
+    pss *= 10**(beta_pss/10)
     sspbch_block[56:183, 0] = pss
 
     # map SSS
     sss = _generate_SSS(N_id_1, N_id_2)
     sspbch_block[56:183, 2] = sss
-
 
     # map PBCH DMRS
     pbch_dmrs = _generate_pbch_dmrs(N_cell_id, n_hf, L_max_hat)
@@ -134,7 +140,7 @@ def _generate_sspbch_block(N_id_1, N_id_2, d_pbch, n_hf, L_max_hat, beta_pss=0, 
     sspbch_block[map_idxs, 3] = pbch_dmrs[-60:]
 
     # map PBCH
-    d_pbch *= beta_pbch
+    d_pbch *= 10**(beta_pbch/10)
     idx = 0
     for n in range(240):
         # continue if index is DMRS index
@@ -171,31 +177,143 @@ def _generate_sspbch_block(N_id_1, N_id_2, d_pbch, n_hf, L_max_hat, beta_pss=0, 
     return sspbch_block
 
 
-def _map_sspbch(dl_grid, sspbch_block, N_cell_id, k_sbb):
-    # TODO: implement _map_sspbch
-    """3GPP 38.211 7.4.3 V.16.0.0
-    :return:
-    """
+def _generate_pbch_block():
+    # TODO: implement _generate_pbch_block from 38.212 7 and 38.321
+    pbch = 0
+
+    return pbch
 
 
-def ss_pbch_block(dl_grid, scs, shared_spectrum=False, large_operat_freq=False):
-    # TODO: implement ss_pbch_block
-    """
+def _map_ss_pbch_block(dl_half_frame, sspbch_block, scs, carrier_frequency, shared_spectrum, paired_spectrum):
+    """3GPP 38.213 4.1 V16.0.0
 
-    :param dl_grid:
-    :param scs:
-    :param shared_spectrum:
-    :param large_operat_freq:
-    :return:
+    :param dl_half_frame: DL half frame
+    :param sspbch_block: SS/PBCH block to map
+    :param scs: subcarrier spacing
+    :param carrier_frequency: frame carrier frequency
+    :param shared_spectrum: shared spectrum indicator
+    :param paired_spectrum: paired/unpaired spectrum indicator
+    :return: mapped DL half frame with SS/PBCH block
     """
-    if scs == 15:  #khz
+    # calculate SS/BPCH frequency indexes
+    freq_start = int(dl_half_frame.shape[0]/2) - 120
+    freq_end = freq_start + 240
+
+    # case A
+    if scs == 15e3:  # hz
+        # SS/PBCH indexes
+        idxs = [2, 8]
+        # SS/PBCH time shift between n
+        shift = 14
+        # get n
         if not shared_spectrum:
-            if not large_operat_freq:
+            if carrier_frequency <= 3e9:
                 n = [0, 1]
-            else:
+            elif 3e9 < carrier_frequency < FR1_HIGH:
                 n = [0, 1, 2, 3]
+            else:
+                raise Exception('Incorrect configuration for SS/PBCH configuration in case A')
         else:
             n = [0, 1, 2, 3, 4]
-        idxs =
-        
-    elif scs == 30:  #khz
+    # case B
+    elif scs == 30e3 and (869e6 < carrier_frequency < 894e6 or 2110e6 < carrier_frequency < 2200e6):  # operating band n5 or n66
+        # SS/PBCH indexes
+        idxs = [4, 8, 16, 20]
+        # SS/PBCH time shift between n
+        shift = 28
+        # get n
+        if carrier_frequency <= 3e9:
+            n = [0]
+        elif 3e9 < carrier_frequency < FR1_HIGH:
+            n = [0, 1]
+        else:
+            raise Exception('Incorrect configuration for SS/PBCH configuration in case B')
+    # case C
+    elif scs == 30e3:  # Hz
+        # SS/PBCH indexes
+        idxs = [2, 8]
+        # SS/PBCH time shift between n
+        shift = 14
+        # get n
+        if not shared_spectrum:
+            if paired_spectrum:
+                if 3e9 < carrier_frequency < FR1_HIGH:
+                    n = [0, 1, 2, 3]
+                else:
+                    raise Exception('Incorrect configuration for SS/PBCH configuration in case C')
+            else:  # unpaired spectrum
+                if carrier_frequency <= 2.4e9:
+                    n = [0, 1]
+                elif 2.4e9 < carrier_frequency < FR1_HIGH:
+                    n = [0, 1, 2, 3]
+                else:
+                    raise Exception('Incorrect configuration for SS/PBCH configuration in case C')
+        else:  # shared spectrum
+            n = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    # case D
+    elif scs == 120e3:  # Hz
+        # SS/PBCH indexes
+        idxs = [4, 8, 16, 20]
+        # SS/PBCH time shift between n
+        shift = 28
+        # get n
+        if FR2_LOW < carrier_frequency < FR2_HIGH:
+            n = [0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18]
+        else:
+            raise Exception('Incorrect configuration for SS/PBCH configuration in case D')
+    # case E
+    elif scs == 240e3:  # Hz
+        # SS/PBCH indexes
+        idxs = [8, 12, 16, 20, 32, 36, 40, 44]
+        # SS/PBCH time shift between n
+        shift = 56
+        # get n
+        if FR2_LOW < carrier_frequency < FR2_HIGH:
+            n = [0, 1, 2, 3, 5, 6, 7, 8]
+        else:
+            raise Exception('Incorrect configuration for SS/PBCH configuration in case E')
+    else:
+        raise Exception('Incorrect configuration for SS/PBCH configuration')
+
+    # map SS/PBCH block
+    for idx in idxs:
+        for nn in n:
+            ss_pbch_idx = idx + shift * nn
+            dl_half_frame[freq_start:freq_end, ss_pbch_idx:ss_pbch_idx+4] = sspbch_block
+
+    return dl_half_frame
+
+
+def ss_pbch_block(dl_frame, ssbSubcarrierSpacing, carrier_frequency, shared_spectrum, paired_spectrum, N_id_1, N_id_2, L_max_hat, beta_pss, beta_pbch):
+    """generate and map SS/PBCH block on one DL frame
+
+    :param dl_frame: DL frame
+    :param ssbSubcarrierSpacing: subcarrier spacing
+    :param carrier_frequency: frame carrier frequency
+    :param shared_spectrum: shared spectrum indicator
+    :param paired_spectrum: paired/unpaired spectrum indicator
+    :param N_id_1: PCI group, range(0, 336)
+    :param N_id_2: physical-layer identity, range(0, 3)
+    :param L_max_hat: maximum half frame index 3GPP. 38.213 4.1 V.16.0.0
+    :param beta_pss: PSS power boost compared to SSS power. Can be 0dB or 3dB. 3GPP 38.213 4.1 V.16.0.0
+    :param beta_pbch: PDCCH DMRS EPRE to SSS EPRE is within -8 dB and 8 dB. 3GPP 38.213 4.1 V.16.0.0
+    :return: DL frame with mapped SS/PBCH blocks
+    """
+    # generate PBCH block
+    d_pbch = _generate_pbch_block
+
+    # loop over the two half frames
+    for n_hf in range(2):
+        # generate SS/PBCH block
+        sspbch_block = _generate_sspbch_block(N_id_1, N_id_2, d_pbch, n_hf, L_max_hat, beta_pss, beta_pbch)
+        # map SS/PBCH block on the half frame
+        dl_frame[:, int(dl_frame.shape[1]/2*n_hf):int(dl_frame.shape[1]/2*(n_hf+1))] =\
+            _map_ss_pbch_block(
+                dl_frame[:, int(dl_frame.shape[1]/2*n_hf):int(dl_frame.shape[1]/2*(n_hf+1))],
+                sspbch_block,
+                ssbSubcarrierSpacing,
+                carrier_frequency,
+                shared_spectrum,
+                paired_spectrum)
+
+    return dl_frame
