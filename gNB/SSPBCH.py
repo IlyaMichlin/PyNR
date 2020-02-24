@@ -5,6 +5,7 @@ Generate and map SS/BPCH block on the downlink grid
 
 import numpy as np
 
+from gNB.GeneralProcedures import crc_calculation
 from gNB.SequenceGeneration import generate_pseudo_random_sequence
 from NRConstants import FR1_HIGH, FR2_LOW, FR2_HIGH
 
@@ -177,8 +178,80 @@ def _generate_sspbch_block(N_id_1, N_id_2, d_pbch, n_hf, L_max_hat, beta_pss=0, 
     return sspbch_block
 
 
-def _generate_pbch_block():
-    # TODO: implement _generate_pbch_block from 38.212 7 and 38.321
+def _pbch_rate_matching(d):
+    # TODO: implement according to 38.212 7.1.5
+    E = 864
+    I_BIL = 0
+
+    # implement according to 38.212 5.4.1
+    f = d
+
+    return f
+
+
+def _pbch_channel_coding(c):
+    # TODO: implement channel coding according to 38.212 7.1.4
+    n_max = 9
+    I_IL = 1
+    n_pc = 0
+    n_PC_wm = 0
+
+    # TODO: implement channel coding according to 38.212 5.3.1
+    d = c
+
+    return d
+
+
+def _pbch_crc(a_prime):
+    """generate and concatenate CRC using CRC24C polynomial
+
+    :param a_prime: input list of bits
+    :return: input list of bits with CRC
+    """
+    # polynomial
+    poly = 'CRC24C'
+
+    # generate parity bits using the polynomial g_CRC24C(D) generator
+    c = crc_calculation(a_prime, poly)
+
+    return c
+
+
+def _pbch_scrambling(a, A, L_max, SFN, N_cell_id):
+    # TODO: implement _pbch_scrambling from 38.212 7.1.2
+    # define M
+    if L_max == 4 or L_max == 8:
+        M = A-3
+    elif L_max == 64:
+        M = A-6
+
+    # define v
+    v = SFN & 3
+
+    # generate c
+    M_pn = A+v*M
+    c_init = N_cell_id
+    c = generate_pseudo_random_sequence(M_pn, c_init)
+
+    # generate s
+    s = np.zeros((A,))
+    j = 0
+    for i in range(A):
+        # TODO: fix the if statement
+        if a[i]:
+            s[i] = 0
+        else:
+            s[i] = c[j+v*M]
+            j += 1
+
+    # generate a_prime
+    a_prime = np.remainder(a+s, 2)
+
+    return a_prime
+
+
+def _generate_pbch_payload(SFN, ):
+    # TODO: implement _generate_pbch_block from 38.212 7 and 38.321 6.1.1
     pbch = 0
 
     return pbch
@@ -300,7 +373,7 @@ def ss_pbch_block(dl_frame, ssbSubcarrierSpacing, carrier_frequency, shared_spec
     :return: DL frame with mapped SS/PBCH blocks
     """
     # generate PBCH block
-    d_pbch = _generate_pbch_block
+    d_pbch = _generate_pbch_payload()
 
     # loop over the two half frames
     for n_hf in range(2):
