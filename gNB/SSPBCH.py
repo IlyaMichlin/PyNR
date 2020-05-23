@@ -6,7 +6,7 @@ Generate and map SS/BPCH block on the downlink grid
 import numpy as np
 
 from gNB.GeneralProcedures import crc_calculation
-from gNB.SequenceGeneration import generate_pseudo_random_sequence
+from gNB.generic_functions import gold_sequence
 from NRConstants import FR1_HIGH, FR2_LOW, FR2_HIGH
 
 
@@ -88,7 +88,7 @@ def _generate_pbch_dmrs(N_cell_id, n_hf, L_max_hat):
         return False
     c_init = 2**11*(i_ssb_hat+1)*(np.floor(N_cell_id/4)+1) + 2**6*(i_ssb+1)*(np.remainder(N_cell_id, 4))
 
-    c = generate_pseudo_random_sequence(M_np, c_init)
+    c = gold_sequence(M_np, c_init)
 
     r = np.zeros((144,), dtype='compex')
     for m in range(144):
@@ -224,6 +224,9 @@ def _pbch_scrambling(a, A, L_max, SFN, N_cell_id):
         M = A-3
     elif L_max == 64:
         M = A-6
+    else:
+        # return 0 if L_max is incorrect
+        return 0
 
     # define v
     v = SFN & 3
@@ -231,7 +234,7 @@ def _pbch_scrambling(a, A, L_max, SFN, N_cell_id):
     # generate c
     M_pn = A+v*M
     c_init = N_cell_id
-    c = generate_pseudo_random_sequence(M_pn, c_init)
+    c = gold_sequence(M_pn, c_init)
 
     # generate s
     s = np.zeros((A,))
@@ -250,9 +253,9 @@ def _pbch_scrambling(a, A, L_max, SFN, N_cell_id):
     return a_prime
 
 
-def _generate_pbch_payload(SFN, ):
+def _generate_pbch_payload(SFN):
     # TODO: implement _generate_pbch_block from 38.212 7 and 38.321 6.1.1
-    pbch = 0
+    pbch = np.zeros((275,))
 
     return pbch
 
@@ -357,7 +360,7 @@ def _map_ss_pbch_block(dl_half_frame, sspbch_block, scs, carrier_frequency, shar
     return dl_half_frame
 
 
-def ss_pbch_block(dl_frame, ssbSubcarrierSpacing, carrier_frequency, shared_spectrum, paired_spectrum, N_id_1, N_id_2, L_max_hat, beta_pss, beta_pbch):
+def ss_pbch_block(dl_frame, ssbSubcarrierSpacing, carrier_frequency, shared_spectrum, paired_spectrum, N_id_1, N_id_2, L_max_hat, beta_pss, beta_pbch, sfn):
     """generate and map SS/PBCH block on one DL frame
 
     :param dl_frame: DL frame
@@ -373,7 +376,7 @@ def ss_pbch_block(dl_frame, ssbSubcarrierSpacing, carrier_frequency, shared_spec
     :return: DL frame with mapped SS/PBCH blocks
     """
     # generate PBCH block
-    d_pbch = _generate_pbch_payload()
+    d_pbch = _generate_pbch_payload(sfn)
 
     # loop over the two half frames
     for n_hf in range(2):
