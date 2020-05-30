@@ -5,12 +5,12 @@ Generate and map SS/BPCH block on the downlink grid
 
 import numpy as np
 
-from gNB.GeneralProcedures import crc_calculation
-from gNB.generic_functions import gold_sequence
+from downlink.general_procedures.crc import crc_calculation
+from downlink.generic_functions import gold_sequence
 from NRConstants import FR1_HIGH, FR2_LOW, FR2_HIGH
 
 
-def _generate_cell_id(N_id_1, N_id_2):
+def generate_cell_id(N_id_1, N_id_2):
     """3GPP 38.211 7.4.2.1 V.16.0.0
 
     :param N_id_1: PCI group, range(0, 336)
@@ -119,7 +119,7 @@ def _generate_sspbch_block(N_id_1, N_id_2, d_pbch, n_hf, L_max_hat, beta_pss=0, 
     sspbch_block = np.zeros((240,4), dtype='complex')
 
     # generate PCI
-    N_cell_id = _generate_cell_id(N_id_1, N_id_2)
+    N_cell_id = generate_cell_id(N_id_1, N_id_2)
 
     # map PSS
     pss = _generate_PSS(N_id_2)
@@ -209,7 +209,7 @@ def _pbch_crc(a_prime):
     :return: input list of bits with CRC
     """
     # polynomial
-    poly = 'CRC24C'
+    poly = 'crc24c'
 
     # generate parity bits using the polynomial g_CRC24C(D) generator
     c = crc_calculation(a_prime, poly)
@@ -218,6 +218,7 @@ def _pbch_crc(a_prime):
 
 
 def _pbch_scrambling(a, A, L_max, SFN, N_cell_id):
+    """"""
     # TODO: implement _pbch_scrambling from 38.212 7.1.2
     # define M
     if L_max == 4 or L_max == 8:
@@ -254,6 +255,7 @@ def _pbch_scrambling(a, A, L_max, SFN, N_cell_id):
 
 
 def _generate_pbch_payload(SFN):
+    """"""
     # TODO: implement _generate_pbch_block from 38.212 7 and 38.321 6.1.1
     pbch = np.zeros((275,))
 

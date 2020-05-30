@@ -15,28 +15,50 @@ k = T_s/T_c  # 64. The ratio between T_s and T_c
 T_f = (delta_f_max * N_f / 100) * T_c  # 10ms. Radio frame duration
 T_sf = (delta_f_max * N_f / 1000) * T_c  # 1ms. Subframe duration
 
+N_rb_sc = 12  # Number of subcarriers per resource block
 
-def get_delta_f(mu):
+
+def get_delta_f(mu, cyclicPrefix):
     """3GPP 38.211 4.2 V.16.0.0
 
     :param mu: subcarrierSpacing
+    :param cyclicPrefix: cyclic prefix
     :return: subcarrier spacing in Hz
     """
-    return 2**mu * 15e3
+    if (cyclicPrefix == 'extended') & (mu == 2):
+        return 2**mu * 15e3
+    elif (cyclicPrefix == 'normal') & (0 <= mu <= 4):
+        return 2**mu * 15e3
+    else:
+        raise Exception('Error: Incorrect cyclicPrefix and mu combination: cyclicPrefix={}, mu={}'.format(cyclicPrefix, mu))
 
 
-def get_Ns(mu, prefix):
+def timing_advance(N_ta, N_ta_offset, msg):
+    """3GPP 38.211 4.3.1 V.16.0.0
+
+    :param N_ta: timing advance between downlink and uplink
+    :param N_ta_offset: a fixed offset used to calculate the timing advance [5, TS 38.213]
+    :param msg: message type
+    :return: timing advance between downlink and uplink
+    """
+    if msg == 'msgA':
+        return 0
+
+    return (N_ta+N_ta_offset)*T_c
+
+
+def get_Ns(mu, cyclicPrefix):
     """3GPP 38.211 4.3.2 V.16.0.0
 
     :param mu: subcarrierSpacing
-    :param prefix: cyclicPrefix
-    :return:
+    :param cyclicPrefix: cyclic prefix
+    :return: N_symb_slot, N_slot_frame, N_slot_subframe
     """
-    if (prefix == 'extended') & (mu == 2):
+    if (cyclicPrefix == 'extended') & (mu == 2):
         N_symb_slot = 12
         N_slot_frame = 40
         N_slot_subframe = 4
-    elif prefix == 'normal':
+    elif cyclicPrefix == 'normal':
         N_symb_slot = 14
         if mu == 0:
             N_slot_frame = 10
@@ -59,21 +81,3 @@ def get_Ns(mu, prefix):
         raise Exception('Error: Incorrect mu and prefix combination')
 
     return N_symb_slot, N_slot_frame, N_slot_subframe
-
-
-# def symbols_in_subframe(mu):
-#     """"""
-
-
-def timing_advance(N_ta, N_ta_offset, msg):
-    """
-
-    :param N_ta: timing advance between downlink and uplink
-    :param N_ta_offset: a fixed offset used to calculate the timing advance [5, TS 38.213]
-    :param msg: message type
-    :return: timing advance between downlink and uplink
-    """
-    if msg == 'msgA':
-        return 0
-
-    return (N_ta+N_ta_offset)*T_c
