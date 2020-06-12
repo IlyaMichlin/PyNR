@@ -5,13 +5,13 @@
 
 import pandas as pd
 
-# GPP 38.101-1 Table 5.1-1 V.16.2.0
+# 3GPP 38.101-1 Table 5.1-1 V.16.2.0
 FR1_LOW = 410e6
 FR1_HIGH = 7125e6
 FR2_LOW = 24250e6
 FR2_HIGH = 52600e6
 
-# GPP 38.101-1 Table 5.4.3.3-1 V.16.2.0
+# 3GPP 38.101-1 Table 5.4.3.3-1 V.16.2.0
 ss_raster = pd.DataFrame({
     'NR Operating Band': [
         'n1',
